@@ -145,3 +145,4 @@ echo -e "     - Restart server:       ${CYAN}pm2 restart attendance-system${NC}"
 echo -e "     - Stop server:          ${CYAN}pm2 stop attendance-system${NC}"
 echo -e "     - Supabase status:      ${CYAN}npx supabase status${NC}"
 echo -e "${GREEN}===================================================================${NC}\n"
+
