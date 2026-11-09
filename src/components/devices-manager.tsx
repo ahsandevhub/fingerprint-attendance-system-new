@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { addDeviceAction, deleteDeviceAction, pingDeviceAction } from "@/lib/actions/devices";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Cpu, Wifi, WifiOff, Plus, Trash2, MapPin, RefreshCw, Loader2 } from "lucide-react";
+import { Cpu, WifiOff, Plus, Trash2, MapPin, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export function DevicesManager({ devices: initialDevices }: { devices: any[] }) {
@@ -16,9 +16,10 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [isPinging, setIsPinging] = useState(false);
-  const [manualStatus, setManualStatus] = useState<Record<number, boolean>>({});
-  // Passive local timer to re-evaluate relative timestamps every 15s without any DB/network hits
+  
+  // High-frequency 1s clock tick so online/offline badge updates precisely in real-time
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const serverOffsetRef = useRef(0);
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -26,15 +27,38 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
     setDevices(initialDevices);
   }, [initialDevices]);
 
-  // Passive 15s tick to recalculate freshness
+  // Tick every 1 second to recalculate live freshness
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 15000);
+      setCurrentTime(Date.now() + serverOffsetRef.current);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Realtime subscription: updates local state in-place without querying DB
+  // Fast background polling every 3s to guarantee freshness even if WebSocket drops
+  const fetchLiveDevices = useCallback(async () => {
+    try {
+      const res = await fetch("/api/devices", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.serverTime) {
+        serverOffsetRef.current = data.serverTime - Date.now();
+      }
+      if (Array.isArray(data.devices)) {
+        setDevices(data.devices);
+      }
+    } catch {
+      // silent fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveDevices();
+    const interval = setInterval(fetchLiveDevices, 3000);
+    return () => clearInterval(interval);
+  }, [fetchLiveDevices]);
+
+  // Realtime subscription for instant 0ms push notifications
   useEffect(() => {
     const channel = supabase
       .channel("devices-live-status")
@@ -47,7 +71,7 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
               prev.map((d) => (d.id === payload.new.id ? { ...d, ...payload.new } : d))
             );
           } else if (payload.eventType === "INSERT") {
-            setDevices((prev) => [...prev, payload.new]);
+            fetchLiveDevices();
           } else if (payload.eventType === "DELETE") {
             setDevices((prev) => prev.filter((d) => d.id === payload.old.id));
           }
@@ -58,27 +82,26 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [supabase, fetchLiveDevices]);
 
   // Manual Ping on demand
   const handleManualPing = async () => {
     setIsPinging(true);
-    const updates: Record<number, boolean> = {};
-
     try {
       await Promise.all(
         devices.map(async (d) => {
           const rawIp = d.ip_address || (d.id === 1 ? "192.168.0.101" : "");
           const ip = (rawIp || "").replace(/^::ffff:/, "").trim();
-          if (!ip) {
-            updates[d.id] = false;
-            return;
-          }
+          if (!ip) return;
           const res = await pingDeviceAction(d.id, ip);
-          updates[d.id] = res.isOnline;
+          if (res?.isOnline && res.lastSeenAt) {
+            setDevices((prev) =>
+              prev.map((item) => (item.id === d.id ? { ...item, last_seen_at: res.lastSeenAt } : item))
+            );
+          }
         })
       );
-      setManualStatus(updates);
+      await fetchLiveDevices();
       toast.success("ডিভাইস স্ট্যাটাস চেক সম্পন্ন হয়েছে।");
     } catch {
       toast.error("ডিভাইস স্ট্যাটাস চেক করতে সমস্যা হয়েছে।");
@@ -99,6 +122,7 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
     } else {
       toast.success("নতুন ডিভাইস সফলভাবে যুক্ত করা হয়েছে!");
       setIsOpen(false);
+      fetchLiveDevices();
     }
   };
 
@@ -106,20 +130,22 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
     if (confirm(`আপনি কি নিশ্চিত যে "${name}" ডিভাইসটি মুছে ফেলতে চান?`)) {
       await deleteDeviceAction(deviceId);
       toast.success("ডিভাইস মুছে ফেলা হয়েছে।");
+      fetchLiveDevices();
     }
   };
 
   const getStatusBadge = (d: any) => {
-    // 45s heartbeat window
-    const diff = d.last_seen_at ? currentTime - new Date(d.last_seen_at).getTime() : Infinity;
-    const isRecentlySeen = diff < 45000;
-    const isOnline = manualStatus[d.id] !== undefined ? manualStatus[d.id] : isRecentlySeen;
+    // Heartbeat sent every 10s -> offline threshold is 25s
+    const diff = d.last_seen_at ? Math.max(0, currentTime - new Date(d.last_seen_at).getTime()) : Infinity;
+    const isOnline = diff < 25000;
 
     if (isOnline) {
+      const secondsAgo = Math.round(diff / 1000);
       return (
         <Badge
           variant="outline"
           className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 gap-1.5 text-xs font-medium"
+          title={`সর্বশেষ হার্টবিট: ${secondsAgo} সেকেন্ড আগে`}
         >
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -134,6 +160,7 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
       <Badge
         variant="outline"
         className="text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 gap-1.5 text-xs"
+        title={d.last_seen_at ? `সর্বশেষ দেখা গেছে: ${new Date(d.last_seen_at).toLocaleTimeString()}` : "কখনও সংযুক্ত হয়নি"}
       >
         <WifiOff className="h-3 w-3 text-rose-500" />
         অফলাইন (সংযোগ নেই)
