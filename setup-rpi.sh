@@ -79,7 +79,12 @@ fi
 
 # Install PM2 and Supabase CLI globally
 echo -e "${YELLOW}Installing PM2 Process Manager & Supabase CLI...${NC}"
-sudo npm install -g pm2 supabase --silent
+NPM_CMD=$(command -v npm || which npm)
+if [ -w "$($NPM_CMD root -g 2>/dev/null || echo '/usr/local/lib/node_modules')" ]; then
+  $NPM_CMD install -g pm2 supabase
+else
+  sudo env "PATH=$PATH" "$NPM_CMD" install -g pm2 supabase
+fi
 
 # 5. Setup Project Environment Variables (.env.local)
 echo -e "\n${CYAN}⚙️  Step 4/6: Configuring Environment Variables...${NC}"
@@ -106,11 +111,11 @@ echo -e "\n${CYAN}📦 Step 5/6: Installing npm packages and starting Supabase c
 npm install
 
 echo -e "${YELLOW}Starting local Supabase container stack (PostgreSQL, Auth, Realtime, Studio)...${NC}"
-# Use sudo for docker commands if current session doesn't have group refreshed yet
+# Use sudo with preserved PATH for docker commands if current session doesn't have group refreshed yet
 if groups | grep -q '\bdocker\b'; then
   npx supabase start || true
 else
-  sudo npx supabase start || true
+  sudo env "PATH=$PATH" npx supabase start || true
 fi
 
 # 7. Build Next.js Application & Start with PM2
