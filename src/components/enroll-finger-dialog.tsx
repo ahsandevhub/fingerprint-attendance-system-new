@@ -11,11 +11,13 @@ export function EnrollFingerDialog({
   userName,
   open,
   onOpenChange,
+  onComplete,
 }: {
   userId: number;
   userName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onComplete?: () => void;
 }) {
   const [message, setMessage] = useState("টার্মিনালের উত্তরের জন্য অপেক্ষা করা হচ্ছে...");
   const [progress, setProgress] = useState(15);
@@ -58,6 +60,7 @@ export function EnrollFingerDialog({
           } else if (row.status === "COMPLETED" || msgLower.includes("stored") || msgLower.includes("id:")) {
             setStatus("COMPLETED");
             setProgress(100);
+            if (onComplete) onComplete();
           } else if (row.status === "FAILED" || msgLower.includes("fail") || msgLower.includes("error")) {
             setStatus("FAILED");
           }
@@ -68,7 +71,7 @@ export function EnrollFingerDialog({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [open, userId, supabase]);
+  }, [open, userId, supabase, onComplete]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,4 +125,3 @@ export function EnrollFingerDialog({
     </Dialog>
   );
 }
-
