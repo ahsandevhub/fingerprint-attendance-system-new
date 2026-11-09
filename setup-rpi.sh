@@ -24,6 +24,7 @@ echo -e "${CYAN}================================================================
 # Detect Raspberry Pi architecture and IP
 ARCH=$(uname -m)
 PI_IP=$(hostname -I | awk '{print $1}')
+PI_IP=${PI_IP:-"192.168.0.106"}
 echo -e "${BLUE}ℹ System Architecture:${NC} $ARCH"
 echo -e "${BLUE}ℹ Raspberry Pi IP:${NC} $PI_IP"
 
