@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AttendeesTable } from "@/components/attendees-table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -32,23 +33,23 @@ export default async function AttendeesPage({
           </p>
         </div>
 
-        <form method="GET" className="flex items-center gap-2">
-          <div className="relative">
-            <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <form method="GET" className="flex items-center gap-3">
+          <div className="relative flex items-center">
+            <Calendar className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               type="date"
               name="date"
               defaultValue={targetDate}
-              className="pl-9 w-44"
+              className="pl-10 h-11 w-48 rounded-2xl border-slate-200 dark:border-border font-medium text-sm focus:ring-2 focus:ring-primary/20"
               aria-label="তারিখ নির্বাচন করুন"
             />
           </div>
-          <button
+          <Button
             type="submit"
-            className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm"
+            className="h-11 px-6 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20"
           >
             ফিল্টার
-          </button>
+          </Button>
         </form>
       </div>
 

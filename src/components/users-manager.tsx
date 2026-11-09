@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { EnrollFingerDialog } from "@/components/enroll-finger-dialog";
 import { UserPlus, Fingerprint, Power, CheckCircle2, AlertCircle, RefreshCw, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -150,9 +152,8 @@ export function UsersManager({
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold">বায়োমেট্রিক ডিভাইস নির্বাচন করুন</label>
-                <select
+                <Select
                   name="deviceId"
-                  className="w-full border rounded-xl p-2.5 bg-background text-sm font-medium focus:ring-2 focus:ring-primary/20"
                   defaultValue={devices[0]?.id || 1}
                 >
                   {devices.map((d) => (
@@ -160,26 +161,26 @@ export function UsersManager({
                       {d.device_name} ({d.placed_on})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="border border-slate-100 dark:border-border rounded-2xl p-4 space-y-3 bg-slate-50/60 dark:bg-muted/20">
                 <div className="text-sm font-bold text-slate-800 dark:text-foreground">অনুমতি ও এক্সেস কন্ট্রোল</div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer font-medium">
-                    <input type="checkbox" name="see_all_presence" defaultChecked className="rounded text-primary focus:ring-primary" />
+                  <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
+                    <Checkbox name="see_all_presence" defaultChecked />
                     সকল উপস্থিতি দেখতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer font-medium">
-                    <input type="checkbox" name="see_users" defaultChecked className="rounded text-primary focus:ring-primary" />
+                  <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
+                    <Checkbox name="see_users" defaultChecked />
                     ব্যবহারকারীদের দেখতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer font-medium">
-                    <input type="checkbox" name="add_user" className="rounded text-primary focus:ring-primary" />
+                  <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
+                    <Checkbox name="add_user" />
                     নতুন ইউজার তৈরি করতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer font-medium">
-                    <input type="checkbox" name="see_all_logs" className="rounded text-primary focus:ring-primary" />
+                  <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
+                    <Checkbox name="see_all_logs" />
                     অডিট লগ দেখতে পারবে
                   </label>
                 </div>

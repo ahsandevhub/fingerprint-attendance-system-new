@@ -34,9 +34,9 @@ export default async function FootprintsPage({
         </p>
       </div>
 
-      <div className="rounded-md border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
             <TableRow>
               <TableHead className="w-16 font-bold">লগ আইডি</TableHead>
               <TableHead className="font-bold">সময়</TableHead>
