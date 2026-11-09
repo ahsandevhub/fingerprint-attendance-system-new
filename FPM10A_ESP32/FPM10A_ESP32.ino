@@ -8,10 +8,22 @@
 #include <WebServer.h>
 #include <Preferences.h>
 
-// Line 0: Header / University Info
-// Line 1: WiFi Status
-// Line 2: Biometric / User Notification
-// Line 3: Terminal IP / Credits
+// line 1 for title
+// line 2 for wifi info
+// line 3 for updates
+// line 4 for ip address
+
+/*
+ * Storage & matching model
+ * ------------------------
+ * - All fingerprint templates live ONLY in the server's PostgreSQL database.
+ * - The sensor's flash library is kept empty (emptyDatabase() at boot).
+ * - The ESP32 downloads the templates from /api/templates into its RAM.
+ * - On every scan, each template is pushed into the sensor's RAM buffer 2 and
+ *   the sensor's own matching algorithm (PS_Match, 0x03) compares it with the
+ *   live scan in buffer 1. This is the same accurate algorithm the sensor used
+ *   before, but nothing is ever written to the sensor's flash.
+ */
 
 Preferences prefs;
 WebServer server(80);
@@ -30,6 +42,22 @@ const int deviceID = 1;
 
 HardwareSerial fingerSerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&fingerSerial);
+
+// ---------- Template cache (RAM only) ----------
+#define TEMPLATE_SIZE 512
+#define MAX_TEMPLATES 150            // ~77 KB of RAM
+#define MIN_MATCH_SCORE 50           // extra safety floor on top of the sensor's own decision
+#define TEMPLATE_SYNC_INTERVAL 30000 // ms
+
+struct CachedTemplate {
+  int userId;
+  uint8_t data[TEMPLATE_SIZE];
+};
+CachedTemplate *tplCache = nullptr;
+int tplCount = 0;
+String tplVersion = "";
+unsigned long lastTplSync = 0;
+uint16_t fpPacketLen = 128; // read from the sensor in setup()
 
 String prevLine[4] = { "", "", "", "" };
 
@@ -54,6 +82,19 @@ void disp(int line, String t) {
   }
   for (int i = len; i < 20; i++) {
     lcd.print(" ");
+  }
+}
+
+String apiUrl(const char *path) {
+  return String(host) + serverIp + ":" + serverPort + path;
+}
+
+void beginHttp(HTTPClient &http, WiFiClientSecure &client, const String &url) {
+  if (isServer) {
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    http.begin(url);
   }
 }
 
@@ -98,73 +139,247 @@ void handleReboot() {
   ESP.restart();
 }
 
-/**
- * Extracts pure 512-byte biometric template from sensor RAM (CharBuffer 1)
- * and formats as a 1024-character hexadecimal string.
- */
-uint8_t extractTemplateHex(String &hexOut) {
-  // Flush any leftover bytes in serial buffer
-  while (fingerSerial.available()) {
-    fingerSerial.read();
-  }
+// =====================================================================
+//  Low-level FPM10A / Synochip UART protocol helpers
+//  Packet: EF 01 | addr(4) | PID | LEN(2) | payload | checksum(2)
+// =====================================================================
+#define FP_PID_CMD 0x01
+#define FP_PID_DATA 0x02
+#define FP_PID_ACK 0x07
+#define FP_PID_END 0x08
 
-  // Ask sensor to upload CharBuffer 1 over UART
-  uint8_t p = finger.getModel();
-  if (p != FINGERPRINT_OK) {
-    Serial.print("getModel error code: ");
-    Serial.println(p);
-    return p;
-  }
-
-  // 2 data packets of 267 bytes each = 534 bytes total
-  uint8_t bytesReceived[534];
-  memset(bytesReceived, 0xff, 534);
-
-  uint32_t starttime = millis();
-  int i = 0;
-  while (i < 534 && (millis() - starttime) < 2500) {
-    if (fingerSerial.available()) {
-      bytesReceived[i++] = fingerSerial.read();
-    }
-  }
-
-  if (i < 534) {
-    Serial.print("Incomplete template stream, received bytes: ");
-    Serial.println(i);
-    return FINGERPRINT_PACKETRECIEVEERR;
-  }
-
-  // Clean data parsing:
-  // Packet 1: 9-byte header + 256 data bytes + 2-byte checksum = 267 bytes
-  // Packet 2: 9-byte header + 256 data bytes + 2-byte checksum = 267 bytes
-  uint8_t cleanTemplate[512];
-  memcpy(cleanTemplate, bytesReceived + 9, 256);
-  memcpy(cleanTemplate + 256, bytesReceived + 9 + 256 + 2 + 9, 256);
-
-  // Convert to 1024-character HEX string
-  hexOut = "";
-  hexOut.reserve(1025);
-  char hexBuf[3];
-  for (int j = 0; j < 512; j++) {
-    sprintf(hexBuf, "%02X", cleanTemplate[j]);
-    hexOut += hexBuf;
-  }
-
-  return FINGERPRINT_OK;
+void fpFlush() {
+  while (fingerSerial.available()) fingerSerial.read();
 }
 
+void fpWritePacket(uint8_t pid, const uint8_t *payload, uint16_t len) {
+  uint16_t pktLen = len + 2;
+  uint8_t hdr[9] = { 0xEF, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, pid, (uint8_t)(pktLen >> 8), (uint8_t)(pktLen & 0xFF) };
+  uint16_t sum = pid + (pktLen >> 8) + (pktLen & 0xFF);
+  for (uint16_t i = 0; i < len; i++) sum += payload[i];
+  fingerSerial.write(hdr, 9);
+  fingerSerial.write(payload, len);
+  fingerSerial.write((uint8_t)(sum >> 8));
+  fingerSerial.write((uint8_t)(sum & 0xFF));
+}
+
+// Reads one packet. Returns payload length, -1 on timeout/format error, -2 on checksum error.
+int fpReadPacket(uint8_t &pid, uint8_t *payload, uint16_t maxLen, uint32_t timeoutMs) {
+  uint32_t start = millis();
+  uint8_t hdr[9];
+  int idx = 0;
+
+  // Sync on EF 01 and read the 9-byte header
+  while (idx < 9 && millis() - start < timeoutMs) {
+    if (!fingerSerial.available()) continue;
+    uint8_t b = fingerSerial.read();
+    if (idx == 0) {
+      if (b == 0xEF) hdr[idx++] = b;
+    } else if (idx == 1) {
+      if (b == 0x01) hdr[idx++] = b;
+      else idx = (b == 0xEF) ? 1 : 0;
+    } else {
+      hdr[idx++] = b;
+    }
+  }
+  if (idx < 9) return -1;
+
+  pid = hdr[6];
+  uint16_t pktLen = ((uint16_t)hdr[7] << 8) | hdr[8];
+  if (pktLen < 2) return -1;
+  uint16_t dataLen = pktLen - 2;
+  if (dataLen > maxLen) return -1;
+
+  uint16_t sum = pid + hdr[7] + hdr[8];
+  uint16_t recvSum = 0;
+  uint16_t got = 0;
+  while (got < pktLen && millis() - start < timeoutMs) {
+    if (!fingerSerial.available()) continue;
+    uint8_t b = fingerSerial.read();
+    if (got < dataLen) {
+      payload[got] = b;
+      sum += b;
+    } else if (got == dataLen) {
+      recvSum = (uint16_t)b << 8;
+    } else {
+      recvSum |= b;
+    }
+    got++;
+  }
+  if (got < pktLen) return -1;
+  if (recvSum != sum) return -2;
+  return dataLen;
+}
+
+// Sends a command packet and returns the confirmation code (0xFF on comm error).
+uint8_t fpCommand(const uint8_t *cmd, uint16_t len, uint8_t *resp = nullptr, int *respLen = nullptr) {
+  fpFlush();
+  fpWritePacket(FP_PID_CMD, cmd, len);
+  uint8_t pid;
+  uint8_t buf[32];
+  int n = fpReadPacket(pid, buf, sizeof(buf), 1500);
+  if (n < 1 || pid != FP_PID_ACK) return 0xFF;
+  if (resp && respLen) {
+    memcpy(resp, buf, n);
+    *respLen = n;
+  }
+  return buf[0];
+}
+
+// Reads a 512-byte template out of the sensor's RAM CharBuffer (UpChar, 0x08).
+bool uploadCharBuffer(uint8_t bufferId, uint8_t *out) {
+  uint8_t cmd[2] = { 0x08, bufferId };
+  if (fpCommand(cmd, 2) != FINGERPRINT_OK) return false;
+
+  uint16_t total = 0;
+  uint8_t chunk[260];
+  while (true) {
+    uint8_t pid;
+    int n = fpReadPacket(pid, chunk, sizeof(chunk), 1500);
+    if (n < 0) return false;
+    if (pid != FP_PID_DATA && pid != FP_PID_END) return false;
+    uint16_t copy = min((uint16_t)n, (uint16_t)(TEMPLATE_SIZE - total));
+    memcpy(out + total, chunk, copy);
+    total += copy;
+    if (pid == FP_PID_END) break;
+  }
+  return total == TEMPLATE_SIZE;
+}
+
+// Writes a 512-byte template into the sensor's RAM CharBuffer (DownChar, 0x09).
+bool downloadCharBuffer(uint8_t bufferId, const uint8_t *in) {
+  uint8_t cmd[2] = { 0x09, bufferId };
+  if (fpCommand(cmd, 2) != FINGERPRINT_OK) return false;
+
+  for (uint16_t off = 0; off < TEMPLATE_SIZE; off += fpPacketLen) {
+    uint16_t len = min((uint16_t)fpPacketLen, (uint16_t)(TEMPLATE_SIZE - off));
+    bool last = (off + len) >= TEMPLATE_SIZE;
+    fpWritePacket(last ? FP_PID_END : FP_PID_DATA, in + off, len);
+  }
+  fingerSerial.flush();
+  return true;
+}
+
+// Compares CharBuffer1 with CharBuffer2 using the sensor's algorithm (Match, 0x03).
+uint8_t matchBuffers(uint16_t &score) {
+  uint8_t cmd[1] = { 0x03 };
+  uint8_t resp[32];
+  int n = 0;
+  uint8_t code = fpCommand(cmd, 1, resp, &n);
+  score = (n >= 3) ? (((uint16_t)resp[1] << 8) | resp[2]) : 0;
+  return code;
+}
+
+// =====================================================================
+//  Hex helpers
+// =====================================================================
+int hexNibble(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  return -1;
+}
+
+bool hexToBytes(const String &hex, uint8_t *out, uint16_t len) {
+  if (hex.length() != (unsigned)(len * 2)) return false;
+  for (uint16_t i = 0; i < len; i++) {
+    int hi = hexNibble(hex[2 * i]);
+    int lo = hexNibble(hex[2 * i + 1]);
+    if (hi < 0 || lo < 0) return false;
+    out[i] = (hi << 4) | lo;
+  }
+  return true;
+}
+
+String bytesToHex(const uint8_t *data, uint16_t len) {
+  static const char digits[] = "0123456789ABCDEF";
+  String s;
+  s.reserve(len * 2 + 1);
+  for (uint16_t i = 0; i < len; i++) {
+    s += digits[data[i] >> 4];
+    s += digits[data[i] & 0x0F];
+  }
+  return s;
+}
+
+// =====================================================================
+//  Template sync from the server (database is the single source of truth)
+// =====================================================================
+bool syncTemplates(bool force) {
+  if (WiFi.status() != WL_CONNECTED || tplCache == nullptr) return false;
+  if (!force && lastTplSync != 0 && millis() - lastTplSync < TEMPLATE_SYNC_INTERVAL) return true;
+  lastTplSync = millis();
+
+  HTTPClient http;
+  WiFiClientSecure client;
+  String url = apiUrl("/api/templates");
+  if (!force && tplVersion.length() > 0) url += "?v=" + tplVersion;
+  http.useHTTP10(true); // plain stream, no chunked encoding
+  beginHttp(http, client, url);
+  http.setTimeout(5000);
+
+  int code = http.GET();
+  if (code != 200) {
+    http.end();
+    Serial.println("Template sync failed, HTTP " + String(code));
+    return false;
+  }
+
+  WiFiClient *stream = http.getStreamPtr();
+  stream->setTimeout(3000);
+
+  String first = stream->readStringUntil('\n');
+  first.trim();
+  if (!first.startsWith("V:")) {
+    http.end();
+    return false;
+  }
+  String newVersion = first.substring(2);
+
+  int newCount = 0;
+  bool finished = false;
+  bool unchanged = false;
+
+  while (true) {
+    String line = stream->readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) break; // timeout / connection closed
+    if (line == "END") {
+      finished = true;
+      break;
+    }
+    if (line == "UNCHANGED") {
+      unchanged = true;
+      continue;
+    }
+    int sep = line.indexOf(':');
+    if (sep <= 0 || newCount >= MAX_TEMPLATES) continue;
+    int uid = line.substring(0, sep).toInt();
+    if (uid <= 0) continue;
+    if (hexToBytes(line.substring(sep + 1), tplCache[newCount].data, TEMPLATE_SIZE)) {
+      tplCache[newCount].userId = uid;
+      newCount++;
+    }
+  }
+  http.end();
+
+  if (unchanged && finished) return true;
+
+  tplCount = newCount;
+  tplVersion = finished ? newVersion : ""; // force a full re-sync next time if incomplete
+  Serial.println("Templates synced from server: " + String(tplCount));
+  return finished;
+}
+
+// =====================================================================
+//  Server communication
+// =====================================================================
 int requestNewIdFromServer() {
   if (WiFi.status() != WL_CONNECTED)
     return 0;
   HTTPClient http;
   WiFiClientSecure client;
-  String url = String(host) + serverIp + ":" + serverPort + "/new-id";
-  if (isServer) {
-    client.setInsecure();
-    http.begin(client, url);
-  } else {
-    http.begin(url);
-  }
+  beginHttp(http, client, apiUrl("/api/new-id"));
   http.setTimeout(1200);
   int httpCode = http.GET();
   int newId = 0;
@@ -173,7 +388,7 @@ int requestNewIdFromServer() {
     DynamicJsonDocument doc(256);
     deserializeJson(doc, payload);
     int requestedDeviceId = doc["deviceId"] | 0;
-    if (requestedDeviceId == deviceID || requestedDeviceId == 0) {
+    if (requestedDeviceId == deviceID) {
       newId = doc["id"] | 0;
       if (newId > 0) {
         disp(2, "id added: " + String(newId));
@@ -184,24 +399,63 @@ int requestNewIdFromServer() {
   return newId;
 }
 
+void uploadMatchedIdToServer(int id) {
+  disp(2, "Updating att:" + String(id));
+  if (WiFi.status() != WL_CONNECTED) {
+    disp(1, "No wifi");
+    return;
+  }
+
+  HTTPClient http;
+  WiFiClientSecure client;
+  beginHttp(http, client, apiUrl("/api/log-id"));
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(3000);
+
+  DynamicJsonDocument doc(128);
+  doc["id"] = id;
+  doc["deviceID"] = deviceID;
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
+  if (httpCode > 0) {
+    String response = http.getString();
+    DynamicJsonDocument r(256);
+    deserializeJson(r, response);
+    int res = r["res"] | 0;
+    String resName = r["name"] | "";
+
+    if (res == 1001) {
+      Serial.println("Attendance done for: " + String(id) + ". " + resName);
+      disp(2, "Thanks " + resName);
+    } else if (res == 1002) {
+      disp(2, "Inactive:" + resName);
+    } else if (res == 1003) {
+      disp(2, "Unknown user #" + String(id));
+      syncTemplates(true);
+    } else {
+      disp(2, "Opps, something wrong");
+    }
+  } else {
+    disp(2, "Error:" + String(httpCode));
+  }
+
+  http.end();
+  delay(1000);
+}
+
 void updateOnNewFinger(int id, String msg, bool isDone) {
   if (WiFi.status() != WL_CONNECTED) {
     disp(1, "No wifi");
-    Serial.println("WiFi not connected, cannot update new finger");
     return;
   }
 
   disp(2, msg);
 
   HTTPClient http;
-  String url = String(host) + serverIp + ":" + serverPort + "/updateOnNewFinger";
   WiFiClientSecure client;
-  if (isServer) {
-    client.setInsecure();
-    http.begin(client, url);
-  } else {
-    http.begin(url);
-  }
+  beginHttp(http, client, apiUrl("/api/updateOnNewFinger"));
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(1500);
 
@@ -212,33 +466,20 @@ void updateOnNewFinger(int id, String msg, bool isDone) {
   String body;
   serializeJson(doc, body);
 
-  int httpCode = http.POST(body);
-  if (httpCode > 0) {
-    String response = http.getString();
-    Serial.println("Server response: " + response);
-  } else {
-    Serial.println("Failed to update new finger, error: " + http.errorToString(httpCode));
-  }
-
+  http.POST(body);
   http.end();
-  delay(500);
+  delay(300);
 }
 
 unsigned long lastHeartbeatTime = 0;
 void sendHeartbeat() {
   if (WiFi.status() != WL_CONNECTED) return;
-  if (millis() - lastHeartbeatTime < 10000 && lastHeartbeatTime != 0) return; // Send ping every 10s
+  if (millis() - lastHeartbeatTime < 10000 && lastHeartbeatTime != 0) return;  // every 10s
   lastHeartbeatTime = millis();
 
   HTTPClient http;
   WiFiClientSecure client;
-  String url = String(host) + serverIp + ":" + serverPort + "/heartbeat";
-  if (isServer) {
-    client.setInsecure();
-    http.begin(client, url);
-  } else {
-    http.begin(url);
-  }
+  beginHttp(http, client, apiUrl("/api/heartbeat"));
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(1200);
 
@@ -253,197 +494,136 @@ void sendHeartbeat() {
   http.end();
 }
 
-/**
- * Enrolls a new fingerprint into Central Server Database (Approach A)
- * ZERO templates are saved to the sensor's flash memory.
- */
+// =====================================================================
+//  Enrollment: 2 scans -> sensor builds the model -> template saved to DB
+// =====================================================================
 bool storeNewFinger(int id) {
-  while (true) {
-    Serial.println("Place finger for first scan...");
+  for (int attempt = 0; attempt < 5; attempt++) {
     updateOnNewFinger(id, "Finger for 1st scan...", false);
     while (finger.getImage() != FINGERPRINT_OK) {
       server.handleClient();
       delay(100);
     }
-
-    int p = finger.image2Tz(1);
-    if (p != FINGERPRINT_OK) {
-      Serial.println("Failed to convert first scan, try again...");
+    if (finger.image2Tz(1) != FINGERPRINT_OK) {
       updateOnNewFinger(id, "Failed 1st scan, retry", false);
-      delay(500);
+      delay(800);
       continue;
     }
 
-    Serial.println("Remove finger...");
     updateOnNewFinger(id, "Remove finger...", false);
-    while (finger.getImage() == FINGERPRINT_OK) {
+    while (finger.getImage() != FINGERPRINT_NOFINGER) {
       server.handleClient();
       delay(100);
     }
     updateOnNewFinger(id, "Finger removed", false);
-    delay(400);
 
-    Serial.println("Place same finger for second scan...");
     updateOnNewFinger(id, "same finger for 2nd scan.", false);
     while (finger.getImage() != FINGERPRINT_OK) {
       server.handleClient();
       delay(100);
     }
-
-    p = finger.image2Tz(2);
-    if (p != FINGERPRINT_OK) {
-      Serial.println("Failed to convert second scan, try again...");
+    if (finger.image2Tz(2) != FINGERPRINT_OK) {
       updateOnNewFinger(id, "Failed 2nd scan, retry", false);
-      delay(500);
+      delay(800);
       continue;
     }
 
-    p = finger.createModel();
-    if (p != FINGERPRINT_OK) {
-      Serial.println("Failed to create model, try again...");
-      updateOnNewFinger(id, "Model error, try again", false);
-      delay(500);
+    // Sensor merges both scans; fails if they are not the same finger
+    if (finger.createModel() != FINGERPRINT_OK) {
+      updateOnNewFinger(id, "Fingers did not match, retry", false);
+      delay(800);
       continue;
     }
 
-    // Extract template from sensor RAM
-    disp(2, "Extracting template...");
-    String templateHex = "";
-    p = extractTemplateHex(templateHex);
-    if (p != FINGERPRINT_OK || templateHex.length() < 100) {
-      Serial.println("Failed to extract template, retry...");
-      updateOnNewFinger(id, "Extract error, retry", false);
-      delay(500);
+    // Read the merged 512-byte template out of sensor RAM (packet-aware)
+    uint8_t tpl[TEMPLATE_SIZE];
+    if (!uploadCharBuffer(1, tpl)) {
+      updateOnNewFinger(id, "Read error, retry", false);
+      delay(800);
       continue;
     }
 
-    // Send template to Server API: /api/enroll-template
     disp(2, "Saving to database...");
     HTTPClient http;
     WiFiClientSecure client;
-    String url = String(host) + serverIp + ":" + serverPort + "/enroll-template";
-    if (isServer) {
-      client.setInsecure();
-      http.begin(client, url);
-    } else {
-      http.begin(url);
-    }
+    beginHttp(http, client, apiUrl("/api/enroll-template"));
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(5000);
 
     DynamicJsonDocument doc(1600);
     doc["user_id"] = id;
-    doc["template"] = templateHex;
+    doc["template"] = bytesToHex(tpl, TEMPLATE_SIZE);
     doc["deviceID"] = deviceID;
     String body;
     serializeJson(doc, body);
 
     int httpCode = http.POST(body);
-    bool enrolledOk = false;
+    bool ok = false;
     if (httpCode > 0) {
-      String response = http.getString();
       DynamicJsonDocument r(256);
-      deserializeJson(r, response);
-      if (r["success"] == true) {
-        enrolledOk = true;
-      }
+      deserializeJson(r, http.getString());
+      ok = r["success"] | false;
     }
     http.end();
 
-    if (enrolledOk) {
-      Serial.println("New finger stored in server database for ID: " + String(id));
-      updateOnNewFinger(id, "Saved in database!", true);
-      // Empty local sensor memory so nothing is stored on hardware
-      finger.emptyDatabase();
+    if (ok) {
+      updateOnNewFinger(id, "New finger ID:" + String(id), true);
       disp(2, "Enrolled: #" + String(id));
-      delay(1500);
+      syncTemplates(true);  // make the new template available immediately
+      delay(1200);
       return true;
-    } else {
-      Serial.println("Server rejected template, HTTP: " + String(httpCode));
-      updateOnNewFinger(id, "Server save failed", false);
-      delay(1000);
     }
+    updateOnNewFinger(id, "Server save failed, retry", false);
+    delay(1000);
   }
+  return false;
 }
 
-/**
- * Captures live finger scan and performs 1:N matching on Central Server (Approach A)
- */
-void matchFingerprintOnServer() {
+// =====================================================================
+//  Identification: live scan vs. every DB template, using the sensor's matcher
+// =====================================================================
+void identifyFinger() {
   disp(2, "Finger found, wait...");
-  Serial.println("Finger detected, preparing server match...");
 
-  // Convert optical scan into character files and model
-  uint8_t p = finger.image2Tz(1);
-  if (p != FINGERPRINT_OK) {
+  if (finger.image2Tz(1) != FINGERPRINT_OK) {
     disp(2, "Try again...");
-    Serial.println("Failed to convert image to features");
-    return;
-  }
-  finger.image2Tz(2);
-  finger.createModel();
-
-  // Extract template hex string from sensor RAM
-  String templateHex = "";
-  p = extractTemplateHex(templateHex);
-  if (p != FINGERPRINT_OK || templateHex.length() < 100) {
-    disp(2, "Sensor read error");
-    Serial.println("Failed to extract template from RAM");
+    delay(800);
     return;
   }
 
-  if (WiFi.status() != WL_CONNECTED) {
-    disp(2, "No WiFi connection");
-    return;
-  }
-
-  disp(2, "Verifying on server..");
-
-  HTTPClient http;
-  WiFiClientSecure client;
-  String url = String(host) + serverIp + ":" + serverPort + "/match-fingerprint";
-  if (isServer) {
-    client.setInsecure();
-    http.begin(client, url);
-  } else {
-    http.begin(url);
-  }
-  http.addHeader("Content-Type", "application/json");
-  http.setTimeout(4000);
-
-  DynamicJsonDocument doc(1600);
-  doc["template"] = templateHex;
-  doc["deviceID"] = deviceID;
-  String body;
-  serializeJson(doc, body);
-
-  int httpCode = http.POST(body);
-  if (httpCode > 0) {
-    String response = http.getString();
-    DynamicJsonDocument r(256);
-    deserializeJson(r, response);
-    bool matched = r["matched"] | false;
-    int res = r["res"] | 0;
-    String resName = r["name"] | "";
-    String resId = r["id"] | "";
-
-    if (matched && res == 1001) {
-      Serial.print("Attendance Done for: ");
-      Serial.print(resId);
-      Serial.print(". ");
-      Serial.println(resName);
-      disp(2, "Thanks " + resName);
-    } else {
-      Serial.println("Fingerprint not recognized on server");
-      disp(2, "Not Recognized");
+  if (tplCount == 0) {
+    syncTemplates(true);
+    if (tplCount == 0) {
+      disp(2, "No users enrolled");
+      delay(1200);
+      return;
     }
-  } else {
-    disp(2, "Error:" + String(httpCode));
-    Serial.println("Server error: " + http.errorToString(httpCode));
   }
 
-  http.end();
-  delay(1200);
+  int bestId = 0;
+  uint16_t bestScore = 0;
+
+  for (int i = 0; i < tplCount; i++) {
+    if (!downloadCharBuffer(2, tplCache[i].data)) continue;
+    uint16_t score = 0;
+    uint8_t code = matchBuffers(score);
+    if (code == FINGERPRINT_OK) {
+      Serial.println("Candidate user " + String(tplCache[i].userId) + " score " + String(score));
+      if (score > bestScore) {
+        bestScore = score;
+        bestId = tplCache[i].userId;
+      }
+    }
+  }
+
+  if (bestId > 0 && bestScore >= MIN_MATCH_SCORE) {
+    Serial.println("MATCH: user " + String(bestId) + " (score " + String(bestScore) + ")");
+    uploadMatchedIdToServer(bestId);
+  } else {
+    Serial.println("No match (best score " + String(bestScore) + ")");
+    disp(2, "Finger not matched");
+    delay(1200);
+  }
 }
 
 void setup() {
@@ -455,6 +635,9 @@ void setup() {
   Wire.begin(15, 2);
   lcd.init();
   disp(0, "  Hello Zahid Sir  ");
+
+  tplCache = (CachedTemplate *)malloc(sizeof(CachedTemplate) * MAX_TEMPLATES);
+  if (!tplCache) Serial.println("ERROR: could not allocate template cache");
 
   wifi_ssid = prefs.getString("ssid", "Sweet Home");
   wifi_password = prefs.getString("pass", "12345678");
@@ -469,15 +652,14 @@ void setup() {
 
   WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
   disp(1, "Connecting to WiFi");
-  Serial.println("Connecting to WiFi");
 
   finger.begin(57600);
   if (finger.verifyPassword()) {
     sensorFound = true;
-    // Approach A: Wipe sensor flash so all storage and matching stays on Server
-    finger.emptyDatabase();
+    if (finger.getParameters() == FINGERPRINT_OK) fpPacketLen = finger.packet_len;
+    finger.emptyDatabase();  // sensor flash stays empty; DB is the only store
+    Serial.println("Sensor OK, packet length: " + String(fpPacketLen));
     disp(2, "Finger Sensor Detected.");
-    Serial.println("Fingerprint sensor detected! (Approach A: Central Server Mode)");
   }
   disp(0, "FacultyAttendanceSys");
 }
@@ -492,23 +674,17 @@ void loop() {
     if (!noWifiShowed) {
       noWifiShowed = true;
       disp(1, "Wifi Not Connected");
-      IPAddress apIP = WiFi.softAPIP();
-      disp(3, "APIP: " + apIP.toString());
-      if (!sensorFound) {
-        disp(2, "No sensor, Reset pls");
-      }
+      disp(3, "APIP: " + WiFi.softAPIP().toString());
+      if (!sensorFound) disp(2, "No sensor, Reset pls");
       delay(500);
     }
     return;
   }
 
-  // Connected to Wi-Fi
   noWifiShowed = false;
   disp(1, "Wifi: " + String(wifi_ssid));
-  IPAddress ip = WiFi.localIP();
-  disp(3, "IP: " + ip.toString());
+  disp(3, "IP: " + WiFi.localIP().toString());
 
-  // Heartbeat to server every 10s
   sendHeartbeat();
 
   if (!sensorFound) {
@@ -519,18 +695,18 @@ void loop() {
     }
     return;
   }
-
   noSensorShowed = false;
 
-  // 1. Check for pending web enrollment requests every 2.5 seconds
+  // Keep the RAM template cache in sync with the database
+  syncTemplates(false);
+
+  // Pending enrollment from the web dashboard?
   if (millis() - lastNewIdCheck > 2500) {
     lastNewIdCheck = millis();
     int newId = requestNewIdFromServer();
     if (newId > 0) {
-      disp(2, "Enrolling ID: #" + String(newId));
-      if (storeNewFinger(newId)) {
-        Serial.println("New finger enrolled successfully into server database");
-      } else {
+      if (!storeNewFinger(newId)) {
+        updateOnNewFinger(newId, "Enrollment failed", false);
         disp(2, "Enrollment failed");
         delay(1000);
       }
@@ -538,21 +714,16 @@ void loop() {
     }
   }
 
-  // 2. Poll sensor for finger touch
-  uint8_t result = finger.getImage();
-  if (result == FINGERPRINT_OK) {
-    // Finger touched! Perform Server-Side Biometric Matching
-    matchFingerprintOnServer();
+  if (finger.getImage() == FINGERPRINT_OK) {
+    identifyFinger();
 
-    // Wait until finger is removed
     disp(2, "Please remove finger");
-    while (finger.getImage() == FINGERPRINT_OK) {
+    while (finger.getImage() != FINGERPRINT_NOFINGER) {
       server.handleClient();
       delay(100);
     }
     disp(2, "");
   } else {
-    // No finger touched, short non-blocking delay
     delay(60);
   }
 }

@@ -8,9 +8,15 @@ export async function POST(req: NextRequest) {
     const templateData = String(body.template || "").trim();
     const deviceID = Number(body.deviceID || body.deviceId || 1);
 
-    if (!userId || !templateData || templateData.length < 64) {
+    // A valid FPM10A template is exactly 512 bytes (1024 hex chars) and must not
+    // contain UART packet headers (EF01FFFFFFFF), which indicate a broken extraction.
+    if (
+      !userId ||
+      !/^[0-9A-Fa-f]{1024}$/.test(templateData) ||
+      templateData.toUpperCase().includes("EF01FFFFFFFF")
+    ) {
       return NextResponse.json(
-        { success: false, error: "Invalid user_id or template data" },
+        { success: false, error: "Invalid user_id or malformed 512-byte template" },
         { status: 400 }
       );
     }
