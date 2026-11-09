@@ -69,9 +69,9 @@ export function AttendeesTable({
         </Button>
       </div>
 
-      <div className="rounded-md border bg-card overflow-hidden print:border-none shadow-sm">
+      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden print:border-none shadow-sm">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
             <TableRow>
               <TableHead className="w-20 text-center font-bold">আইডি</TableHead>
               <TableHead className="font-bold">অনুষদ / কর্মীর নাম</TableHead>

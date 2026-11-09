@@ -124,35 +124,35 @@ export function UsersManager({
         </div>
 
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 cursor-pointer">
+          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 h-11 px-5 cursor-pointer">
             <UserPlus className="h-4 w-4" />
             নতুন ব্যবহারকারী যোগ করুন
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg rounded-3xl">
             <DialogHeader>
-              <DialogTitle>নতুন সদস্য যোগ করুন</DialogTitle>
+              <DialogTitle className="text-xl font-bold">নতুন সদস্য যোগ করুন</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4 pt-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">পুরো নাম *</label>
-                <Input name="name" placeholder="যেমন: ড. মোঃ জাহিদ হাসান" required />
+                <label className="text-sm font-semibold">পুরো নাম *</label>
+                <Input name="name" placeholder="যেমন: ড. মোঃ জাহিদ হাসান" required className="rounded-xl" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">ফোন নম্বর *</label>
-                  <Input name="phone" placeholder="017xxxxxxxx" required />
+                  <label className="text-sm font-semibold">ফোন নম্বর *</label>
+                  <Input name="phone" placeholder="017xxxxxxxx" required className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">ইমেল</label>
-                  <Input type="email" name="email" placeholder="zahid@ugv.edu.bd" />
+                  <label className="text-sm font-semibold">ইমেল</label>
+                  <Input type="email" name="email" placeholder="zahid@ugv.edu.bd" className="rounded-xl" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">বায়োমেট্রিক ডিভাইস নির্বাচন করুন</label>
+                <label className="text-sm font-semibold">বায়োমেট্রিক ডিভাইস নির্বাচন করুন</label>
                 <select
                   name="deviceId"
-                  className="w-full border rounded-md p-2 bg-background text-sm"
+                  className="w-full border rounded-xl p-2.5 bg-background text-sm font-medium focus:ring-2 focus:ring-primary/20"
                   defaultValue={devices[0]?.id || 1}
                 >
                   {devices.map((d) => (
@@ -163,30 +163,30 @@ export function UsersManager({
                 </select>
               </div>
 
-              <div className="border rounded-md p-4 space-y-3 bg-muted/20">
-                <div className="text-sm font-semibold">অনুমতি ও এক্সেস কন্ট্রোল</div>
+              <div className="border border-slate-100 dark:border-border rounded-2xl p-4 space-y-3 bg-slate-50/60 dark:bg-muted/20">
+                <div className="text-sm font-bold text-slate-800 dark:text-foreground">অনুমতি ও এক্সেস কন্ট্রোল</div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="see_all_presence" defaultChecked />
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input type="checkbox" name="see_all_presence" defaultChecked className="rounded text-primary focus:ring-primary" />
                     সকল উপস্থিতি দেখতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="see_users" defaultChecked />
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input type="checkbox" name="see_users" defaultChecked className="rounded text-primary focus:ring-primary" />
                     ব্যবহারকারীদের দেখতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="add_user" />
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input type="checkbox" name="add_user" className="rounded text-primary focus:ring-primary" />
                     নতুন ইউজার তৈরি করতে পারবে
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="see_all_logs" />
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input type="checkbox" name="see_all_logs" className="rounded text-primary focus:ring-primary" />
                     অডিট লগ দেখতে পারবে
                   </label>
                 </div>
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={isPending}>
+                <Button type="submit" disabled={isPending} className="rounded-xl h-11 px-5 font-bold shadow-md shadow-primary/20">
                   {isPending ? "সংরক্ষণ হচ্ছে..." : "যোগ করুন এবং আঙুলের ছাপ নিন"}
                 </Button>
               </DialogFooter>
@@ -195,20 +195,20 @@ export function UsersManager({
         </Dialog>
       </div>
 
-      <div className="rounded-md border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="w-16 font-bold">আইডি</TableHead>
-              <TableHead className="font-bold">নাম ও পদবী</TableHead>
-              <TableHead className="font-bold">যোগাযোগ</TableHead>
-              <TableHead className="font-bold text-center">স্ট্যাটাস</TableHead>
-              <TableHead className="font-bold">পারমিশন</TableHead>
-              <TableHead className="font-bold text-center">ফিঙ্গারপ্রিন্ট স্ট্যাটাস</TableHead>
-              <TableHead className="text-right font-bold">অ্যাকশন</TableHead>
+          <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
+            <TableRow className="border-b border-slate-100 dark:border-border">
+              <TableHead className="w-16 font-bold text-xs uppercase tracking-wider">আইডি</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider">নাম ও পদবী</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider">যোগাযোগ</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-center">স্ট্যাটাস</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider">পারমিশন</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-center">ফিঙ্গারপ্রিন্ট স্ট্যাটাস</TableHead>
+              <TableHead className="text-right font-bold text-xs uppercase tracking-wider">অ্যাকশন</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="divide-y divide-slate-100 dark:divide-border/60">
             {users.map((u) => {
               const isRegistered = registeredUserIds.has(u.id);
 

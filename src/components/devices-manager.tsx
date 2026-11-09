@@ -178,50 +178,50 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
             size="sm"
             onClick={handleManualPing}
             disabled={isPinging}
-            className="gap-1.5 text-xs"
+            className="gap-1.5 text-xs rounded-xl h-10 px-4 font-semibold border-slate-200 dark:border-border"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isPinging ? "animate-spin" : ""}`} />
             স্ট্যাটাস রিফ্রেশ
           </Button>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 cursor-pointer">
+            <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 h-10 px-5 cursor-pointer">
               <Plus className="h-4 w-4" />
               নতুন ডিভাইস যুক্ত করুন
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md rounded-3xl">
               <DialogHeader>
-                <DialogTitle>নতুন ফিঙ্গারপ্রিন্ট টার্মিনাল কনফিগার করুন</DialogTitle>
+                <DialogTitle className="text-xl font-bold">নতুন ফিঙ্গারপ্রিন্ট টার্মিনাল কনফিগার করুন</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAddDevice} className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">টার্মিনালের নাম *</label>
-                  <Input name="device_name" placeholder="যেমন: সিএসই ডিপার্টমেন্ট রিডার" required />
+                  <label className="text-sm font-semibold">টার্মিনালের নাম *</label>
+                  <Input name="device_name" placeholder="যেমন: সিএসই ডিপার্টমেন্ট রিডার" required className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">ম্যাক অ্যাড্রেস (MAC Address) *</label>
-                  <Input name="mac_address" placeholder="যেমন: F0:24:F9:0C:4F:B4" required />
+                  <label className="text-sm font-semibold">ম্যাক অ্যাড্রেস (MAC Address) *</label>
+                  <Input name="mac_address" placeholder="যেমন: F0:24:F9:0C:4F:B4" required className="rounded-xl" />
                   <p className="text-[11px] text-muted-foreground">
                     ESP32 স্টার্টআপে সিরিয়াল মনিটরে বা LCD তে ম্যাক অ্যাড্রেস দেখায়।
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">আইপি অ্যাড্রেস (IP Address)</label>
-                  <Input name="ip_address" placeholder="যেমন: 192.168.0.101" />
+                  <label className="text-sm font-semibold">আইপি অ্যাড্রেস (IP Address)</label>
+                  <Input name="ip_address" placeholder="যেমন: 192.168.0.101" className="rounded-xl" />
                   <p className="text-[11px] text-muted-foreground">ESP32 LCD স্ক্রিনে প্রদর্শিত IP অ্যাড্রেস লিখুন।</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">স্থাপিত স্থান (Placement Location)</label>
-                  <Input name="placed_on" placeholder="যেমন: রুম ৩০২, ৩য় তলা" />
+                  <label className="text-sm font-semibold">স্থাপিত স্থান (Placement Location)</label>
+                  <Input name="placed_on" placeholder="যেমন: রুম ৩০২, ৩য় তলা" className="rounded-xl" />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={isPending}>
+                  <Button type="submit" disabled={isPending} className="rounded-xl font-bold h-11 px-5 shadow-md shadow-primary/20">
                     {isPending ? "যুক্ত হচ্ছে..." : "ডিভাইস সংরক্ষণ করুন"}
                   </Button>
                 </DialogFooter>
@@ -231,7 +231,7 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
         </div>
       </div>
 
-      <div className="rounded-md border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
