@@ -3,6 +3,7 @@ import { AttendeesTable } from "@/components/attendees-table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
+import { getDhakaDate } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function AttendeesPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const today = new Date().toISOString().split("T")[0];
+  const today = getDhakaDate();
   const targetDate = date || today;
 
   const supabase = await createClient();

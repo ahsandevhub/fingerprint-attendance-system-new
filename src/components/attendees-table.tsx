@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Printer, CheckCircle2, LogIn, LogOut } from "lucide-react";
+import { formatDhakaTime } from "@/lib/date-utils";
 
 export function AttendeesTable({
   initialData,
@@ -103,14 +104,14 @@ export function AttendeesTable({
                   <TableCell className="text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400">
                     <span className="flex items-center gap-1">
                       <LogIn className="h-3 w-3" />
-                      {new Date(row.in_time).toLocaleTimeString()}
+                      {formatDhakaTime(row.in_time)}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs font-mono font-medium">
                     {row.out_time ? (
                       <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                         <LogOut className="h-3 w-3" />
-                        {new Date(row.out_time).toLocaleTimeString()}
+                        {formatDhakaTime(row.out_time)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">--:--:--</span>

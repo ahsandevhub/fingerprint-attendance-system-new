@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { formatDhakaDateTime } from "@/lib/date-utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { FileText, ShieldAlert } from "lucide-react";
@@ -57,8 +58,8 @@ export default async function FootprintsPage({
               logs?.map((l) => (
                 <TableRow key={l.id} className="hover:bg-muted/40 transition-colors">
                   <TableCell className="font-mono text-xs">#{l.id}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(l.created_at).toLocaleString()}
+                  <TableCell className="text-xs text-muted-foreground font-mono">
+                    {formatDhakaDateTime(l.created_at)}
                   </TableCell>
                   <TableCell className="text-xs font-medium">
                     {l.profiles ? (

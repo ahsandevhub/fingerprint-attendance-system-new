@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getDhakaDate } from "@/lib/date-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,62 +35,117 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Compute attendance record for today (YYYY-MM-DD)
-    const today = new Date().toISOString().split("T")[0];
+    // 2. Compute attendance record for today in Bangladesh Time (GMT+6)
+    const today = getDhakaDate();
     const nowIso = new Date().toISOString();
 
     const { data: existingRecord } = await supabase
       .from("attendees")
-      .select("id, in_time")
+      .select("id, in_time, out_time")
       .eq("user_id", id)
       .eq("att_date", today)
       .maybeSingle();
 
-    if (!existingRecord) {
-      // First swipe -> inTime check-in
-      await supabase.from("attendees").insert({
-        user_id: id,
-        att_date: today,
-        in_time: nowIso,
-        out_time: null,
-        device_id: deviceID,
-      });
-    } else {
-      // Subsequent swipes -> outTime checkout update
-      await supabase
-        .from("attendees")
-        .update({
-          out_time: nowIso,
-          device_id: deviceID,
-        })
-        .eq("id", existingRecord.id);
-    }
-
-    // 3. Log audit footprint and touch device last_seen_at
     const rawIp = req.headers.get("x-forwarded-for") || "127.0.0.1";
     const clientIp = rawIp.split(",")[0].trim().replace(/^::ffff:/, "");
-    await Promise.all([
-      supabase.from("footprints").insert({
-        user_id: id,
-        type: "FINGER_ATTENDENCE",
-        details: {
-          id,
-          name: user.name,
-          deviceID,
-          time: nowIso,
-        },
-        ip: clientIp,
-        user_agent: req.headers.get("user-agent") || "ESP32-HTTPClient",
-      }),
-      supabase
-        .from("devices")
-        .update({ last_seen_at: nowIso, ip_address: clientIp })
-        .eq("id", deviceID),
-    ]);
 
-    // 4. Return success response (code 1001) matching ESP32 firmware expectations
+    // Update device heartbeat and last seen
+    await supabase
+      .from("devices")
+      .update({ last_seen_at: nowIso, ip_address: clientIp })
+      .eq("id", deviceID);
+
+    // Case A: First scan of the day -> Check-in
+    if (!existingRecord) {
+      await Promise.all([
+        supabase.from("attendees").insert({
+          user_id: id,
+          att_date: today,
+          in_time: nowIso,
+          out_time: null,
+          device_id: deviceID,
+        }),
+        supabase.from("footprints").insert({
+          user_id: id,
+          type: "FINGER_ATTENDENCE",
+          details: {
+            id,
+            name: user.name,
+            deviceID,
+            action: "CHECK_IN",
+            time: nowIso,
+            date: today,
+          },
+          ip: clientIp,
+          user_agent: req.headers.get("user-agent") || "ESP32-HTTPClient",
+        }),
+      ]);
+
+      return NextResponse.json({
+        res: 1001,
+        type: "IN",
+        id: String(user.id),
+        name: user.name,
+        msg: `In: ${user.name}`,
+      });
+    }
+
+    // Case B: Second scan of the day -> Checkout
+    if (!existingRecord.out_time) {
+      await Promise.all([
+        supabase
+          .from("attendees")
+          .update({
+            out_time: nowIso,
+            device_id: deviceID,
+          })
+          .eq("id", existingRecord.id),
+        supabase.from("footprints").insert({
+          user_id: id,
+          type: "FINGER_ATTENDENCE",
+          details: {
+            id,
+            name: user.name,
+            deviceID,
+            action: "CHECK_OUT",
+            time: nowIso,
+            date: today,
+          },
+          ip: clientIp,
+          user_agent: req.headers.get("user-agent") || "ESP32-HTTPClient",
+        }),
+      ]);
+
+      return NextResponse.json({
+        res: 1001,
+        type: "OUT",
+        id: String(user.id),
+        name: user.name,
+        msg: `Out: ${user.name}`,
+      });
+    }
+
+    // Case C: Third or subsequent scan on the same day -> Reject!
+    // Both in_time and out_time are already recorded.
+    await supabase.from("footprints").insert({
+      user_id: id,
+      type: "FINGER_REJECTED",
+      details: {
+        id,
+        name: user.name,
+        deviceID,
+        reason: "Already checked out for today",
+        time: nowIso,
+        date: today,
+      },
+      ip: clientIp,
+      user_agent: req.headers.get("user-agent") || "ESP32-HTTPClient",
+    });
+
     return NextResponse.json({
-      res: 1001,
+      res: 1005,
+      type: "REJECTED",
+      msg: "Already checked out",
       id: String(user.id),
       name: user.name,
     });

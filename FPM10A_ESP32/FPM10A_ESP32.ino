@@ -425,15 +425,25 @@ void uploadMatchedIdToServer(int id) {
     deserializeJson(r, response);
     int res = r["res"] | 0;
     String resName = r["name"] | "";
+    String resType = r["type"] | "";
 
     if (res == 1001) {
-      Serial.println("Attendance done for: " + String(id) + ". " + resName);
-      disp(2, "Thanks " + resName);
+      Serial.println("Attendance done (" + resType + ") for: " + String(id) + ". " + resName);
+      if (resType == "IN") {
+        disp(2, "In: " + resName);
+      } else if (resType == "OUT") {
+        disp(2, "Out: " + resName);
+      } else {
+        disp(2, "Thanks " + resName);
+      }
     } else if (res == 1002) {
       disp(2, "Inactive:" + resName);
     } else if (res == 1003) {
       disp(2, "Unknown user #" + String(id));
       syncTemplates(true);
+    } else if (res == 1005) {
+      Serial.println("Attendance rejected (already checked out): " + String(id) + " - " + resName);
+      disp(2, "Already Checked Out");
     } else {
       disp(2, "Opps, something wrong");
     }
@@ -442,7 +452,7 @@ void uploadMatchedIdToServer(int id) {
   }
 
   http.end();
-  delay(1000);
+  delay(1500);
 }
 
 void updateOnNewFinger(int id, String msg, bool isDone) {
