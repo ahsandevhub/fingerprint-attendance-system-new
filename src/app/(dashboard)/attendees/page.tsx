@@ -40,13 +40,13 @@ export default async function AttendeesPage({
               type="date"
               name="date"
               defaultValue={targetDate}
-              className="pl-10 h-11 w-48 rounded-2xl border-slate-200 dark:border-border font-medium text-sm focus:ring-2 focus:ring-primary/20"
+              className="pl-10 h-10 w-48 rounded-md border-slate-200 dark:border-border font-medium text-sm focus:ring-2 focus:ring-primary/20"
               aria-label="তারিখ নির্বাচন করুন"
             />
           </div>
           <Button
             type="submit"
-            className="h-11 px-6 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20"
+            className="h-10 px-5 rounded-md font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
           >
             ফিল্টার
           </Button>

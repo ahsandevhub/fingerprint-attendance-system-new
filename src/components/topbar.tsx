@@ -38,7 +38,7 @@ export function Topbar({
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileOpen(true)}
-            className="lg:hidden h-10 w-10 rounded-xl"
+            className="lg:hidden h-10 w-10 rounded-md"
             aria-label="Open Menu"
           >
             <Menu className="h-5 w-5" />
@@ -118,7 +118,7 @@ export function Topbar({
                   onClick={() => setIsMobileOpen(false)}
                   className="flex items-center gap-3"
                 >
-                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-purple-500 flex items-center justify-center text-white">
+                  <div className="h-10 w-10 rounded-md bg-gradient-to-tr from-violet-600 to-purple-500 flex items-center justify-center text-white">
                     <Fingerprint className="h-5 w-5" />
                   </div>
                   <span className="font-bold text-xl tracking-tight">UGV FAS</span>
@@ -127,7 +127,7 @@ export function Topbar({
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsMobileOpen(false)}
-                  className="rounded-xl"
+                  className="rounded-md"
                 >
                   <X className="h-5 w-5" />
                 </Button>
@@ -142,7 +142,7 @@ export function Topbar({
                       key={item.href}
                       href={item.href}
                       onClick={() => setIsMobileOpen(false)}
-                      className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-colors ${
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-md text-sm font-semibold transition-colors ${
                         isActive
                           ? "bg-primary text-white shadow-md shadow-primary/25"
                           : "text-slate-600 hover:bg-slate-50"
@@ -161,7 +161,7 @@ export function Topbar({
                 <Button
                   variant="outline"
                   type="submit"
-                  className="w-full gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 rounded-xl"
+                  className="w-full gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 rounded-md"
                 >
                   <LogOut className="h-4 w-4" />
                   লগআউট

@@ -73,7 +73,7 @@
   --chart-3: oklch(0.75 0.17 65);            /* Amber */
   --chart-4: oklch(0.70 0.18 150);           /* Emerald Green */
   --chart-5: oklch(0.65 0.22 15);            /* Coral */
-  --radius: 0.875rem;                        /* Modern rounded corners (14px) */
+  --radius: 0.5rem;                          /* Clean md rounded corners (8px) */
   --sidebar: oklch(1 0 0);                   /* Pure white sidebar */
   --sidebar-foreground: oklch(0.25 0.02 265);
   --sidebar-primary: oklch(0.55 0.24 288);

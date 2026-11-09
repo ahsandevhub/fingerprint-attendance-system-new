@@ -69,7 +69,7 @@ export function AttendeesTable({
         </Button>
       </div>
 
-      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden print:border-none shadow-sm">
+      <div className="rounded-md border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden print:border-none shadow-sm">
         <Table>
           <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
             <TableRow>

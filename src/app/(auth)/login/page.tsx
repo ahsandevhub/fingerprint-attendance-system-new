@@ -18,10 +18,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50/60 via-slate-50 to-purple-50/40 dark:from-slate-950 dark:to-slate-900 p-4 sm:p-6">
-      <Card className="w-full max-w-md shadow-2xl shadow-purple-500/10 border border-slate-100 dark:border-border/80 bg-white dark:bg-card rounded-3xl overflow-hidden p-2 sm:p-4">
+      <Card className="w-full max-w-md shadow-2xl shadow-purple-500/10 border border-slate-100 dark:border-border/80 bg-white dark:bg-card rounded-md overflow-hidden p-2 sm:p-4">
         <CardHeader className="text-center space-y-2 pb-6">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-tr from-violet-600 to-purple-500 text-white rounded-2xl flex items-center justify-center mb-1 shadow-lg shadow-purple-500/25">
-            <Fingerprint className="h-9 w-9 stroke-[2.2]" />
+          <div className="mx-auto h-14 w-14 bg-gradient-to-tr from-violet-600 to-purple-500 text-white rounded-md flex items-center justify-center mb-1 shadow-md shadow-purple-500/25">
+            <Fingerprint className="h-8 w-8 stroke-[2.2]" />
           </div>
           <CardTitle className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-foreground tracking-tight font-sans">
             ইউজিভি এফএএস লগইন
@@ -34,7 +34,7 @@ export default function LoginPage() {
         <form action={formAction}>
           <CardContent className="space-y-5 px-6 sm:px-8">
             {state?.error && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm rounded-2xl font-semibold text-center animate-in fade-in zoom-in-95">
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm rounded-md font-semibold text-center animate-in fade-in zoom-in-95">
                 {state.error}
               </div>
             )}
@@ -48,7 +48,7 @@ export default function LoginPage() {
                 <Input
                   name="identifier"
                   placeholder="01700000000"
-                  className="pl-10 h-11 rounded-2xl border-slate-200 dark:border-border bg-slate-50/60 dark:bg-muted/30 focus-visible:bg-white dark:focus-visible:bg-card text-sm font-medium"
+                  className="pl-10 h-10 rounded-md border-slate-200 dark:border-border bg-slate-50/60 dark:bg-muted/30 focus-visible:bg-white dark:focus-visible:bg-card text-sm font-medium"
                   defaultValue="01700000000"
                   required
                 />
@@ -65,7 +65,7 @@ export default function LoginPage() {
                   type="password"
                   name="password"
                   placeholder="••••••••"
-                  className="pl-10 h-11 rounded-2xl border-slate-200 dark:border-border bg-slate-50/60 dark:bg-muted/30 focus-visible:bg-white dark:focus-visible:bg-card text-sm font-medium"
+                  className="pl-10 h-10 rounded-md border-slate-200 dark:border-border bg-slate-50/60 dark:bg-muted/30 focus-visible:bg-white dark:focus-visible:bg-card text-sm font-medium"
                   required
                 />
               </div>
@@ -75,7 +75,7 @@ export default function LoginPage() {
           <CardFooter className="px-6 sm:px-8 pt-4 pb-6">
             <Button
               type="submit"
-              className="w-full h-11 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/25 text-sm transition-all"
+              className="w-full h-10 rounded-md font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/25 text-sm transition-all"
               disabled={isPending}
             >
               {isPending ? "লগইন হচ্ছে..." : "লগইন করুন"}

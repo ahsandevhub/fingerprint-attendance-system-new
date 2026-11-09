@@ -184,44 +184,44 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
             size="sm"
             onClick={handleManualPing}
             disabled={isPinging}
-            className="gap-1.5 text-xs rounded-xl h-10 px-4 font-semibold border-slate-200 dark:border-border"
+            className="gap-1.5 text-xs rounded-md h-9 px-3.5 font-semibold border-slate-200 dark:border-border"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isPinging ? "animate-spin" : ""}`} />
             স্ট্যাটাস রিফ্রেশ
           </Button>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 h-10 px-5 cursor-pointer">
+            <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 h-9 px-4 cursor-pointer">
               <Plus className="h-4 w-4" />
               নতুন ডিভাইস যুক্ত করুন
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-3xl">
+            <DialogContent className="sm:max-w-md rounded-md">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold">নতুন ফিঙ্গারপ্রিন্ট টার্মিনাল কনফিগার করুন</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAddDevice} className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">টার্মিনালের নাম *</label>
-                  <Input name="device_name" placeholder="যেমন: সিএসই ডিপার্টমেন্ট রিডার" required className="rounded-xl" />
+                  <Input name="device_name" placeholder="যেমন: সিএসই ডিপার্টমেন্ট রিডার" required className="rounded-md" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">ম্যাক অ্যাড্রেস (MAC Address) *</label>
-                  <Input name="mac_address" placeholder="যেমন: F0:24:F9:0C:4F:B4" required className="rounded-xl" />
+                  <Input name="mac_address" placeholder="যেমন: F0:24:F9:0C:4F:B4" required className="rounded-md" />
                   <p className="text-[11px] text-muted-foreground">
                     ESP32 স্টার্টআপে সিরিয়াল মনিটরে বা LCD তে ম্যাক অ্যাড্রেস দেখায়।
                   </p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">আইপি অ্যাড্রেস (IP Address)</label>
-                  <Input name="ip_address" placeholder="যেমন: 192.168.0.101" className="rounded-xl" />
+                  <Input name="ip_address" placeholder="যেমন: 192.168.0.101" className="rounded-md" />
                   <p className="text-[11px] text-muted-foreground">ESP32 LCD স্ক্রিনে প্রদর্শিত IP অ্যাড্রেস লিখুন।</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">স্থাপিত স্থান (Placement Location)</label>
-                  <Input name="placed_on" placeholder="যেমন: রুম ৩০২, ৩য় তলা" className="rounded-xl" />
+                  <Input name="placed_on" placeholder="যেমন: রুম ৩০২, ৩য় তলা" className="rounded-md" />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={isPending} className="rounded-xl font-bold h-11 px-5 shadow-md shadow-primary/20">
+                  <Button type="submit" disabled={isPending} className="rounded-md font-bold h-10 px-5 shadow-sm">
                     {isPending ? "যুক্ত হচ্ছে..." : "ডিভাইস সংরক্ষণ করুন"}
                   </Button>
                 </DialogFooter>
@@ -231,7 +231,7 @@ export function DevicesManager({ devices: initialDevices }: { devices: any[] }) 
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
+      <div className="rounded-md border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>

@@ -126,27 +126,27 @@ export function UsersManager({
         </div>
 
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 h-11 px-5 cursor-pointer">
+          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 h-10 px-4 cursor-pointer">
             <UserPlus className="h-4 w-4" />
             নতুন ব্যবহারকারী যোগ করুন
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg rounded-3xl">
+          <DialogContent className="sm:max-w-lg rounded-md">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">নতুন সদস্য যোগ করুন</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4 pt-2">
               <div className="space-y-2">
                 <label className="text-sm font-semibold">পুরো নাম *</label>
-                <Input name="name" placeholder="যেমন: ড. মোঃ জাহিদ হাসান" required className="rounded-xl" />
+                <Input name="name" placeholder="যেমন: ড. মোঃ জাহিদ হাসান" required className="rounded-md" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">ফোন নম্বর *</label>
-                  <Input name="phone" placeholder="017xxxxxxxx" required className="rounded-xl" />
+                  <Input name="phone" placeholder="017xxxxxxxx" required className="rounded-md" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">ইমেল</label>
-                  <Input type="email" name="email" placeholder="zahid@ugv.edu.bd" className="rounded-xl" />
+                  <Input type="email" name="email" placeholder="zahid@ugv.edu.bd" className="rounded-md" />
                 </div>
               </div>
 
@@ -164,7 +164,7 @@ export function UsersManager({
                 </Select>
               </div>
 
-              <div className="border border-slate-100 dark:border-border rounded-2xl p-4 space-y-3 bg-slate-50/60 dark:bg-muted/20">
+              <div className="border border-slate-100 dark:border-border rounded-md p-4 space-y-3 bg-slate-50/60 dark:bg-muted/20">
                 <div className="text-sm font-bold text-slate-800 dark:text-foreground">অনুমতি ও এক্সেস কন্ট্রোল</div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
@@ -187,7 +187,7 @@ export function UsersManager({
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={isPending} className="rounded-xl h-11 px-5 font-bold shadow-md shadow-primary/20">
+                <Button type="submit" disabled={isPending} className="rounded-md h-10 px-5 font-bold shadow-sm">
                   {isPending ? "সংরক্ষণ হচ্ছে..." : "যোগ করুন এবং আঙুলের ছাপ নিন"}
                 </Button>
               </DialogFooter>
@@ -196,7 +196,7 @@ export function UsersManager({
         </Dialog>
       </div>
 
-      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
+      <div className="rounded-md border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
             <TableRow className="border-b border-slate-100 dark:border-border">

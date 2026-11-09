@@ -58,8 +58,8 @@ export function Sidebar({ className = "" }: { className?: string }) {
       <div className="space-y-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group px-2">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-purple-500 flex items-center justify-center text-white shadow-md shadow-purple-500/25 group-hover:scale-105 transition-transform">
-            <Fingerprint className="h-6 w-6 stroke-[2.2]" />
+          <div className="h-10 w-10 rounded-md bg-gradient-to-tr from-violet-600 to-purple-500 flex items-center justify-center text-white shadow-md shadow-purple-500/25 group-hover:scale-105 transition-transform">
+            <Fingerprint className="h-5 w-5 stroke-[2.2]" />
           </div>
           <div>
             <div className="font-extrabold text-2xl tracking-tight text-slate-900 dark:text-foreground flex items-center gap-1.5 font-sans">
@@ -84,15 +84,15 @@ export function Sidebar({ className = "" }: { className?: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3.5 py-2.5 rounded-md text-sm font-semibold transition-all duration-200 ${
                   isActive
                     ? "bg-primary/10 text-primary dark:bg-primary/20 shadow-sm shadow-primary/5"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-accent/40"
                 }`}
               >
-                <div className="flex items-center gap-3.5">
+                <div className="flex items-center gap-3">
                   <div
-                    className={`p-2 rounded-xl transition-colors ${
+                    className={`p-1.5 rounded-md transition-colors ${
                       isActive
                         ? "bg-primary text-white shadow-sm shadow-primary/20"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-primary/10 group-hover:text-primary"
@@ -123,12 +123,12 @@ export function Sidebar({ className = "" }: { className?: string }) {
 
       {/* Bottom Promo / System Info Card */}
       <div className="space-y-4">
-        <div className="relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 text-white shadow-xl shadow-purple-500/20">
+        <div className="relative overflow-hidden rounded-md p-4 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 text-white shadow-lg shadow-purple-500/20">
           <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
           
           <div className="flex items-center gap-2 mb-2">
-            <div className="h-7 w-7 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
-              <Sparkles className="h-4 w-4" />
+            <div className="h-6 w-6 rounded-md bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+              <Sparkles className="h-3.5 w-3.5" />
             </div>
             <span className="text-[11px] font-bold tracking-wider uppercase text-purple-200">
               UGV FAS v2.0
@@ -138,11 +138,11 @@ export function Sidebar({ className = "" }: { className?: string }) {
           <h4 className="font-bold text-sm leading-snug text-white">
             ক্লাউড বায়োমেট্রিক সার্ভার
           </h4>
-          <p className="text-xs text-purple-100/80 mt-1 mb-3.5">
+          <p className="text-xs text-purple-100/80 mt-1 mb-3">
             রাস্পবেরি পাই ও ESP32 রিয়েলটাইম হার্ডওয়্যার সংযুক্ত।
           </p>
 
-          <div className="flex items-center justify-between bg-black/20 backdrop-blur-md rounded-xl px-3 py-2 text-xs font-mono">
+          <div className="flex items-center justify-between bg-black/20 backdrop-blur-md rounded-md px-3 py-2 text-xs font-mono">
             <span className="flex items-center gap-1.5 text-emerald-300">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               সক্রিয়

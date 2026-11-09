@@ -34,7 +34,7 @@ export default async function FootprintsPage({
         </p>
       </div>
 
-      <div className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
+      <div className="rounded-md border border-slate-100 dark:border-border/80 bg-white dark:bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-slate-50/70 dark:bg-muted/30">
             <TableRow>

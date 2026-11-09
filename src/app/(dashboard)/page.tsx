@@ -102,7 +102,7 @@ export default async function DashboardPage() {
 
         <div className="flex items-center gap-3">
           <Link href="/attendees">
-            <Button className="rounded-2xl px-5 py-2.5 h-auto text-sm font-semibold shadow-md shadow-primary/20 bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
+            <Button className="rounded-md px-4 py-2 h-auto text-sm font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
               <Clock className="h-4 w-4" />
               আজকের উপস্থিতি দেখুন
             </Button>
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
           const Icon = c.icon;
           return (
             <Link key={c.title} href={c.href} className="group">
-              <Card className="rounded-3xl border border-slate-100 dark:border-border/80 bg-white dark:bg-card shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden relative p-6 h-full flex flex-col justify-between">
+              <Card className="rounded-md border border-slate-100 dark:border-border/80 bg-white dark:bg-card shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden relative p-5 h-full flex flex-col justify-between">
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-xs font-semibold text-slate-500 dark:text-muted-foreground">
@@ -127,9 +127,9 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                   <div
-                    className={`h-12 w-12 rounded-2xl ${c.bg} flex items-center justify-center ${c.color} shadow-sm group-hover:scale-105 transition-transform`}
+                    className={`h-11 w-11 rounded-md ${c.bg} flex items-center justify-center ${c.color} shadow-sm group-hover:scale-105 transition-transform`}
                   >
-                    <Icon className="h-6 w-6" />
+                    <Icon className="h-5 w-5" />
                   </div>
                 </div>
 
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
       {/* Middle Row: Quick Action Banners & Hardware Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Banner 1: Terminal Status */}
-        <div className="lg:col-span-2 rounded-3xl bg-white dark:bg-card border border-slate-100 dark:border-border/80 p-6 sm:p-7 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 rounded-md bg-white dark:bg-card border border-slate-100 dark:border-border/80 p-6 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-foreground">
@@ -169,11 +169,11 @@ export default async function DashboardPage() {
               devices.map((d: any) => (
                 <div
                   key={d.id}
-                  className="rounded-2xl border border-slate-100 dark:border-border p-4 bg-slate-50/50 dark:bg-muted/20 flex items-center justify-between"
+                  className="rounded-md border border-slate-100 dark:border-border p-4 bg-slate-50/50 dark:bg-muted/20 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
-                      <Cpu className="h-5 w-5" />
+                    <div className="h-9 w-9 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
+                      <Cpu className="h-4 w-4" />
                     </div>
                     <div>
                       <div className="font-bold text-sm text-slate-900 dark:text-foreground">
@@ -206,7 +206,7 @@ export default async function DashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-xl text-xs font-semibold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50"
+                className="rounded-md text-xs font-semibold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50"
               >
                 ডিভাইস পরিচালনা করুন
               </Button>
@@ -215,13 +215,13 @@ export default async function DashboardPage() {
         </div>
 
         {/* Banner 2: Quick Enrollment Card in Purple Gradient */}
-        <div className="rounded-3xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white p-7 shadow-lg shadow-purple-500/20 flex flex-col justify-between relative overflow-hidden">
+        <div className="rounded-md bg-gradient-to-br from-violet-600 to-indigo-700 text-white p-6 shadow-md shadow-purple-500/20 flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="h-8 w-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Fingerprint className="h-5 w-5" />
+              <div className="h-7 w-7 rounded-md bg-white/20 backdrop-blur-md flex items-center justify-center">
+                <Fingerprint className="h-4 w-4" />
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-purple-200">
                 দ্রুত নিবন্ধন
@@ -238,7 +238,7 @@ export default async function DashboardPage() {
 
           <div className="mt-6">
             <Link href="/users">
-              <Button className="w-full bg-white text-violet-700 hover:bg-purple-50 font-bold rounded-2xl h-11 text-sm shadow-md">
+              <Button className="w-full bg-white text-violet-700 hover:bg-purple-50 font-bold rounded-md h-10 text-sm shadow-sm">
                 ইউজার তালিকায় যান
               </Button>
             </Link>
@@ -247,7 +247,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Bottom Row: Recent Attendance Records */}
-      <div className="rounded-3xl bg-white dark:bg-card border border-slate-100 dark:border-border/80 p-6 sm:p-7 shadow-sm">
+      <div className="rounded-md bg-white dark:bg-card border border-slate-100 dark:border-border/80 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-foreground">
