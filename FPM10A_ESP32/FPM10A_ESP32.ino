@@ -24,7 +24,7 @@ const char *ap_pass = "12345678";
 
 const bool isServer = false;
 const char *host = isServer ? "https://" : "http://";
-const char *serverIp = "192.168.0.103";
+const char *serverIp = "192.168.0.106";
 const int serverPort = 3000;
 const int deviceID = 1;
 
@@ -99,38 +99,49 @@ void handleReboot() {
 }
 
 /**
- * Extracts 512-byte biometric template from sensor RAM
- * and formats as a 1024-character hexadecimal string for Server DB Backup.
+ * Extracts pure 512-byte biometric template from sensor RAM (CharBuffer 1)
+ * and formats as a 1024-character hexadecimal string.
  */
 uint8_t extractTemplateHex(String &hexOut) {
+  // Flush any leftover bytes in serial buffer
   while (fingerSerial.available()) {
     fingerSerial.read();
   }
 
+  // Ask sensor to upload CharBuffer 1 over UART
   uint8_t p = finger.getModel();
   if (p != FINGERPRINT_OK) {
+    Serial.print("getModel error code: ");
+    Serial.println(p);
     return p;
   }
 
+  // 2 data packets of 267 bytes each = 534 bytes total
   uint8_t bytesReceived[534];
   memset(bytesReceived, 0xff, 534);
 
   uint32_t starttime = millis();
   int i = 0;
-  while (i < 534 && (millis() - starttime) < 2000) {
+  while (i < 534 && (millis() - starttime) < 2500) {
     if (fingerSerial.available()) {
       bytesReceived[i++] = fingerSerial.read();
     }
   }
 
   if (i < 534) {
+    Serial.print("Incomplete template stream, received bytes: ");
+    Serial.println(i);
     return FINGERPRINT_PACKETRECIEVEERR;
   }
 
+  // Clean data parsing:
+  // Packet 1: 9-byte header + 256 data bytes + 2-byte checksum = 267 bytes
+  // Packet 2: 9-byte header + 256 data bytes + 2-byte checksum = 267 bytes
   uint8_t cleanTemplate[512];
   memcpy(cleanTemplate, bytesReceived + 9, 256);
   memcpy(cleanTemplate + 256, bytesReceived + 9 + 256 + 2 + 9, 256);
 
+  // Convert to 1024-character HEX string
   hexOut = "";
   hexOut.reserve(1025);
   char hexBuf[3];
@@ -147,7 +158,7 @@ int requestNewIdFromServer() {
     return 0;
   HTTPClient http;
   WiFiClientSecure client;
-  String url = String(host) + serverIp + ":" + serverPort + "/api/new-id";
+  String url = String(host) + serverIp + ":" + serverPort + "/new-id";
   if (isServer) {
     client.setInsecure();
     http.begin(client, url);
@@ -173,76 +184,17 @@ int requestNewIdFromServer() {
   return newId;
 }
 
-void uploadMatchedIdToServer(int id) {
-  disp(2, "Updating att:" + String(id));
-  Serial.println("Uploading matched ID to server...");
-  if (WiFi.status() != WL_CONNECTED) {
-    disp(1, "No wifi");
-    return;
-  }
-
-  HTTPClient http;
-  String url = String(host) + serverIp + ":" + serverPort + "/api/log-id";
-  WiFiClientSecure client;
-  if (isServer) {
-    client.setInsecure();
-    http.begin(client, url);
-  } else {
-    http.begin(url);
-  }
-  http.addHeader("Content-Type", "application/json");
-  http.setTimeout(3000);
-
-  DynamicJsonDocument doc(128);
-  doc["id"] = id;
-  doc["deviceID"] = deviceID;
-  String body;
-  serializeJson(doc, body);
-
-  int httpCode = http.POST(body);
-  if (httpCode > 0) {
-    String response = http.getString();
-    DynamicJsonDocument r(128);
-    deserializeJson(r, response);
-    int res = r["res"];
-    String resId = r["id"];
-    String resName = r["name"];
-
-    if (res == 1001) {
-      Serial.print("Attendance Confirmed for: ");
-      Serial.print(resId);
-      Serial.print(". ");
-      Serial.println(resName);
-      disp(2, "Thanks " + resName);
-    } else if (res == 1002) {
-      Serial.print("User inactive: ");
-      Serial.println(resName);
-      disp(2, "Inactive:" + resName);
-    } else if (res == 1003) {
-      finger.deleteModel(id);
-      Serial.println("User not found in DB, removed from sensor");
-      disp(2, "Unknown user:" + String(id));
-    } else {
-      disp(2, "Opps, error");
-    }
-  } else {
-    disp(2, "Server error:" + String(httpCode));
-  }
-
-  http.end();
-  delay(1200);
-}
-
 void updateOnNewFinger(int id, String msg, bool isDone) {
   if (WiFi.status() != WL_CONNECTED) {
     disp(1, "No wifi");
+    Serial.println("WiFi not connected, cannot update new finger");
     return;
   }
 
   disp(2, msg);
 
   HTTPClient http;
-  String url = String(host) + serverIp + ":" + serverPort + "/api/updateOnNewFinger";
+  String url = String(host) + serverIp + ":" + serverPort + "/updateOnNewFinger";
   WiFiClientSecure client;
   if (isServer) {
     client.setInsecure();
@@ -264,21 +216,23 @@ void updateOnNewFinger(int id, String msg, bool isDone) {
   if (httpCode > 0) {
     String response = http.getString();
     Serial.println("Server response: " + response);
+  } else {
+    Serial.println("Failed to update new finger, error: " + http.errorToString(httpCode));
   }
 
   http.end();
-  delay(400);
+  delay(500);
 }
 
 unsigned long lastHeartbeatTime = 0;
 void sendHeartbeat() {
   if (WiFi.status() != WL_CONNECTED) return;
-  if (millis() - lastHeartbeatTime < 10000 && lastHeartbeatTime != 0) return; // Every 10s
+  if (millis() - lastHeartbeatTime < 10000 && lastHeartbeatTime != 0) return; // Send ping every 10s
   lastHeartbeatTime = millis();
 
   HTTPClient http;
   WiFiClientSecure client;
-  String url = String(host) + serverIp + ":" + serverPort + "/api/heartbeat";
+  String url = String(host) + serverIp + ":" + serverPort + "/heartbeat";
   if (isServer) {
     client.setInsecure();
     http.begin(client, url);
@@ -300,8 +254,8 @@ void sendHeartbeat() {
 }
 
 /**
- * 100% Reliable Hardware Biometric Enrollment
- * Stores in hardware memory for instant DSP search AND backs up template to PostgreSQL DB
+ * Enrolls a new fingerprint into Central Server Database (Approach A)
+ * ZERO templates are saved to the sensor's flash memory.
  */
 bool storeNewFinger(int id) {
   while (true) {
@@ -315,7 +269,7 @@ bool storeNewFinger(int id) {
     int p = finger.image2Tz(1);
     if (p != FINGERPRINT_OK) {
       Serial.println("Failed to convert first scan, try again...");
-      updateOnNewFinger(id, "Scan 1 failed, retry", false);
+      updateOnNewFinger(id, "Failed 1st scan, retry", false);
       delay(500);
       continue;
     }
@@ -339,7 +293,7 @@ bool storeNewFinger(int id) {
     p = finger.image2Tz(2);
     if (p != FINGERPRINT_OK) {
       Serial.println("Failed to convert second scan, try again...");
-      updateOnNewFinger(id, "Scan 2 failed, retry", false);
+      updateOnNewFinger(id, "Failed 2nd scan, retry", false);
       delay(500);
       continue;
     }
@@ -352,47 +306,144 @@ bool storeNewFinger(int id) {
       continue;
     }
 
-    // 1. Store in optical sensor hardware flash memory
-    p = finger.storeModel(id);
-    if (p == FINGERPRINT_OK) {
-      Serial.println("Finger stored in sensor memory with ID: " + String(id));
+    // Extract template from sensor RAM
+    disp(2, "Extracting template...");
+    String templateHex = "";
+    p = extractTemplateHex(templateHex);
+    if (p != FINGERPRINT_OK || templateHex.length() < 100) {
+      Serial.println("Failed to extract template, retry...");
+      updateOnNewFinger(id, "Extract error, retry", false);
+      delay(500);
+      continue;
+    }
 
-      // 2. Also back up 512-byte template to PostgreSQL database
-      String templateHex = "";
-      extractTemplateHex(templateHex);
-      if (templateHex.length() > 100) {
-        HTTPClient http;
-        WiFiClientSecure client;
-        String url = String(host) + serverIp + ":" + serverPort + "/api/enroll-template";
-        if (isServer) {
-          client.setInsecure();
-          http.begin(client, url);
-        } else {
-          http.begin(url);
-        }
-        http.addHeader("Content-Type", "application/json");
-        http.setTimeout(3000);
+    // Send template to Server API: /api/enroll-template
+    disp(2, "Saving to database...");
+    HTTPClient http;
+    WiFiClientSecure client;
+    String url = String(host) + serverIp + ":" + serverPort + "/enroll-template";
+    if (isServer) {
+      client.setInsecure();
+      http.begin(client, url);
+    } else {
+      http.begin(url);
+    }
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(5000);
 
-        DynamicJsonDocument doc(1600);
-        doc["user_id"] = id;
-        doc["template"] = templateHex;
-        doc["deviceID"] = deviceID;
-        String body;
-        serializeJson(doc, body);
-        http.POST(body);
-        http.end();
+    DynamicJsonDocument doc(1600);
+    doc["user_id"] = id;
+    doc["template"] = templateHex;
+    doc["deviceID"] = deviceID;
+    String body;
+    serializeJson(doc, body);
+
+    int httpCode = http.POST(body);
+    bool enrolledOk = false;
+    if (httpCode > 0) {
+      String response = http.getString();
+      DynamicJsonDocument r(256);
+      deserializeJson(r, response);
+      if (r["success"] == true) {
+        enrolledOk = true;
       }
+    }
+    http.end();
 
-      updateOnNewFinger(id, "New finger ID:" + String(id), true);
+    if (enrolledOk) {
+      Serial.println("New finger stored in server database for ID: " + String(id));
+      updateOnNewFinger(id, "Saved in database!", true);
+      // Empty local sensor memory so nothing is stored on hardware
+      finger.emptyDatabase();
       disp(2, "Enrolled: #" + String(id));
       delay(1500);
       return true;
     } else {
-      Serial.println("Failed to store model, error: " + String(p));
-      updateOnNewFinger(id, "Sensor store failed", false);
+      Serial.println("Server rejected template, HTTP: " + String(httpCode));
+      updateOnNewFinger(id, "Server save failed", false);
       delay(1000);
     }
   }
+}
+
+/**
+ * Captures live finger scan and performs 1:N matching on Central Server (Approach A)
+ */
+void matchFingerprintOnServer() {
+  disp(2, "Finger found, wait...");
+  Serial.println("Finger detected, preparing server match...");
+
+  // Convert optical scan into character files and model
+  uint8_t p = finger.image2Tz(1);
+  if (p != FINGERPRINT_OK) {
+    disp(2, "Try again...");
+    Serial.println("Failed to convert image to features");
+    return;
+  }
+  finger.image2Tz(2);
+  finger.createModel();
+
+  // Extract template hex string from sensor RAM
+  String templateHex = "";
+  p = extractTemplateHex(templateHex);
+  if (p != FINGERPRINT_OK || templateHex.length() < 100) {
+    disp(2, "Sensor read error");
+    Serial.println("Failed to extract template from RAM");
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    disp(2, "No WiFi connection");
+    return;
+  }
+
+  disp(2, "Verifying on server..");
+
+  HTTPClient http;
+  WiFiClientSecure client;
+  String url = String(host) + serverIp + ":" + serverPort + "/match-fingerprint";
+  if (isServer) {
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    http.begin(url);
+  }
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(4000);
+
+  DynamicJsonDocument doc(1600);
+  doc["template"] = templateHex;
+  doc["deviceID"] = deviceID;
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
+  if (httpCode > 0) {
+    String response = http.getString();
+    DynamicJsonDocument r(256);
+    deserializeJson(r, response);
+    bool matched = r["matched"] | false;
+    int res = r["res"] | 0;
+    String resName = r["name"] | "";
+    String resId = r["id"] | "";
+
+    if (matched && res == 1001) {
+      Serial.print("Attendance Done for: ");
+      Serial.print(resId);
+      Serial.print(". ");
+      Serial.println(resName);
+      disp(2, "Thanks " + resName);
+    } else {
+      Serial.println("Fingerprint not recognized on server");
+      disp(2, "Not Recognized");
+    }
+  } else {
+    disp(2, "Error:" + String(httpCode));
+    Serial.println("Server error: " + http.errorToString(httpCode));
+  }
+
+  http.end();
+  delay(1200);
 }
 
 void setup() {
@@ -423,8 +474,10 @@ void setup() {
   finger.begin(57600);
   if (finger.verifyPassword()) {
     sensorFound = true;
+    // Approach A: Wipe sensor flash so all storage and matching stays on Server
+    finger.emptyDatabase();
     disp(2, "Finger Sensor Detected.");
-    Serial.println("Fingerprint sensor detected! 100% Reliable Hardware Biometric Mode.");
+    Serial.println("Fingerprint sensor detected! (Approach A: Central Server Mode)");
   }
   disp(0, "FacultyAttendanceSys");
 }
@@ -476,7 +529,7 @@ void loop() {
     if (newId > 0) {
       disp(2, "Enrolling ID: #" + String(newId));
       if (storeNewFinger(newId)) {
-        Serial.println("New finger enrolled successfully");
+        Serial.println("New finger enrolled successfully into server database");
       } else {
         disp(2, "Enrollment failed");
         delay(1000);
@@ -488,28 +541,8 @@ void loop() {
   // 2. Poll sensor for finger touch
   uint8_t result = finger.getImage();
   if (result == FINGERPRINT_OK) {
-    disp(2, "Finger found, wait...");
-    Serial.println("Finger detected, verifying...");
-
-    result = finger.image2Tz(1);
-    if (result != FINGERPRINT_OK) {
-      disp(2, "Try again...");
-      return;
-    }
-
-    // 100% RELIABLE HARDWARE DSP SEARCH
-    // Matches against enrolled finger with FAR < 0.001%
-    result = finger.fingerFastSearch();
-    int id = finger.fingerID;
-
-    if (result == FINGERPRINT_OK && id > 0) {
-      Serial.println("Finger matched with ID: " + String(id));
-      uploadMatchedIdToServer(id);
-    } else {
-      Serial.println("Finger NOT recognized!");
-      disp(2, "Finger not matched");
-      delay(1200);
-    }
+    // Finger touched! Perform Server-Side Biometric Matching
+    matchFingerprintOnServer();
 
     // Wait until finger is removed
     disp(2, "Please remove finger");
@@ -519,7 +552,7 @@ void loop() {
     }
     disp(2, "");
   } else {
-    // Non-blocking sleep
+    // No finger touched, short non-blocking delay
     delay(60);
   }
 }
