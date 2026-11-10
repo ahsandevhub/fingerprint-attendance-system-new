@@ -8,8 +8,9 @@ export default async function proxy(request: NextRequest) {
     },
   });
 
+  const supabaseUrl = process.env.SUPABASE_INTERNAL_URL || "http://127.0.0.1:54321";
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
