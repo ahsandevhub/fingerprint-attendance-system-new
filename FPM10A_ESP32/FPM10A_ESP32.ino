@@ -36,8 +36,8 @@ const char *ap_pass = "12345678";
 
 const bool isServer = false;
 const char *host = isServer ? "https://" : "http://";
-const char *serverIp = "192.168.0.106";
-const int serverPort = 3000;
+String serverIp = "192.168.0.106";
+int serverPort = 3000;
 const int deviceID = 1;
 
 HardwareSerial fingerSerial(2);
@@ -86,7 +86,7 @@ void disp(int line, String t) {
 }
 
 String apiUrl(const char *path) {
-  return String(host) + serverIp + ":" + serverPort + path;
+  return String(host) + serverIp + ":" + String(serverPort) + path;
 }
 
 void beginHttp(HTTPClient &http, WiFiClientSecure &client, const String &url) {
@@ -99,43 +99,112 @@ void beginHttp(HTTPClient &http, WiFiClientSecure &client, const String &url) {
 }
 
 void handleRoot() {
-  String page = R"(<!DOCTYPE html><html><head><meta charset='UTF-8'><title>WiFi Config</title></head><body><h2>Update WiFi</h2><form method='POST' action='/save'>SSID: <input type='text' name='ssid' value=')";
+  String page = R"(<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>UGV FAS - Terminal Config</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 20px 14px; color: #0f172a; }
+    .card { background: white; max-width: 400px; margin: 10px auto; padding: 26px 22px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    h2 { margin: 0 0 6px 0; color: #7c3aed; font-size: 21px; font-weight: 700; }
+    p { margin: 0 0 20px 0; font-size: 13px; color: #64748b; }
+    .field { margin-bottom: 15px; }
+    label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 5px; color: #334155; }
+    input[type='text'], input[type='number'] { width: 100%; box-sizing: border-box; padding: 11px 13px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; }
+    input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15); }
+    .btn { width: 100%; background: #7c3aed; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 700; font-size: 15px; margin-top: 10px; cursor: pointer; }
+    .btn:hover { background: #6d28d9; }
+    .footer { text-align: center; margin-top: 18px; font-size: 13px; }
+    .footer a { color: #dc2626; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class='card'>
+    <h2>UGV FAS Terminal</h2>
+    <p>Configure WiFi network & server endpoint</p>
+    <form method='POST' action='/save'>
+      <div class='field'>
+        <label>WiFi SSID</label>
+        <input type='text' name='ssid' value=')";
   page += wifi_ssid;
-  page += R"('><br>Password: <input type='text' name='pass' value=')";
+  page += R"(' required placeholder='WiFi Network Name'>
+      </div>
+      <div class='field'>
+        <label>WiFi Password</label>
+        <input type='text' name='pass' value=')";
   page += wifi_password;
-  page += R"('><br><input type='submit' value='Save'></form><br><a href="/reboot">Reboot</a></body></html>)";
+  page += R"(' placeholder='WiFi Password'>
+      </div>
+      <div class='field'>
+        <label>Server IP / Hostname</label>
+        <input type='text' name='srv_ip' value=')";
+  page += serverIp;
+  page += R"(' required placeholder='e.g. 172.29.100.232 or 192.168.0.106'>
+      </div>
+      <div class='field'>
+        <label>Server Port</label>
+        <input type='number' name='srv_port' value=')";
+  page += String(serverPort);
+  page += R"(' required placeholder='3000'>
+      </div>
+      <button type='submit' class='btn'>Save & Reboot Terminal</button>
+    </form>
+    <div class='footer'>
+      <a href='/reboot'>Reboot Without Saving</a>
+    </div>
+  </div>
+</body>
+</html>)";
 
   server.send(200, "text/html", page);
-
   disp(2, "Settings Opened!");
   delay(1000);
-  disp(2, "");
+  disp(2, "Srv:" + serverIp);
 }
 
 void handleSave() {
-  if (server.hasArg("ssid") && server.hasArg("pass")) {
+  if (server.hasArg("ssid") && server.hasArg("srv_ip")) {
     wifi_ssid = server.arg("ssid");
     wifi_password = server.arg("pass");
+    serverIp = server.arg("srv_ip");
+    serverIp.trim();
+    if (server.hasArg("srv_port") && server.arg("srv_port").toInt() > 0) {
+      serverPort = server.arg("srv_port").toInt();
+    }
+
     prefs.putString("ssid", wifi_ssid);
     prefs.putString("pass", wifi_password);
-    server.send(200, "text/html", "<h3>Saved! ESP will reboot to apply new WiFi.</h3>");
+    prefs.putString("srv_ip", serverIp);
+    prefs.putInt("srv_port", serverPort);
+
+    String resp = R"(<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{font-family:sans-serif;padding:30px 16px;text-align:center;background:#f8fafc;}h2{color:#16a34a;margin-top:0;}.box{background:white;padding:24px;max-width:380px;margin:auto;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,0.06);border:1px solid #e2e8f0;}b{color:#7c3aed;}</style></head><body><div class='box'><h2>Settings Saved!</h2><p>Rebooting terminal to connect to:<br><br>WiFi: <b>)";
+    resp += wifi_ssid;
+    resp += R"(</b><br>Server: <b>)";
+    resp += serverIp + ":" + String(serverPort);
+    resp += R"(</b></p><p style='color:#64748b;font-size:13px;margin-top:20px;'>Terminal restarting, please wait...</p></div></body></html>)";
+
+    server.send(200, "text/html", resp);
+
     disp(0, "        FAS        ");
-    disp(1, "New WiFi Saved");
-    disp(2, "Rebooting for Reload");
-    disp(3, " Programmed by AHSAN");
+    disp(1, "Config Saved");
+    disp(2, "Srv:" + serverIp);
+    disp(3, "Rebooting...");
     delay(2000);
     ESP.restart();
+  } else {
+    server.send(400, "text/plain", "Missing required fields (ssid, srv_ip)");
   }
 }
 
 void handleReboot() {
-  server.sendHeader("Refresh", "2; URL=/");
-  server.send(200, "text/html", "<h3>ESP will reboot.</h3>");
+  server.send(200, "text/html", "<h3>Terminal rebooting...</h3>");
   disp(0, "        FAS        ");
   disp(1, "Restarting");
   disp(2, "Rebooting for Reload");
   disp(3, " Programmed by AHSAN");
-  delay(2000);
+  delay(1500);
   ESP.restart();
 }
 
@@ -651,6 +720,8 @@ void setup() {
 
   wifi_ssid = prefs.getString("ssid", "Sweet Home");
   wifi_password = prefs.getString("pass", "12345678");
+  serverIp = prefs.getString("srv_ip", "192.168.0.106");
+  serverPort = prefs.getInt("srv_port", 3000);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ap_ssid, ap_pass);
@@ -658,10 +729,12 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/save", handleSave);
   server.on("/reboot", handleReboot);
+  server.onNotFound(handleRoot);
   server.begin();
 
   WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
   disp(1, "Connecting to WiFi");
+  disp(2, "Srv:" + serverIp);
 
   finger.begin(57600);
   if (finger.verifyPassword()) {
@@ -684,6 +757,7 @@ void loop() {
     if (!noWifiShowed) {
       noWifiShowed = true;
       disp(1, "Wifi Not Connected");
+      disp(2, "AP: " + String(ap_ssid));
       disp(3, "APIP: " + WiFi.softAPIP().toString());
       if (!sensorFound) disp(2, "No sensor, Reset pls");
       delay(500);
@@ -693,6 +767,7 @@ void loop() {
 
   noWifiShowed = false;
   disp(1, "Wifi: " + String(wifi_ssid));
+  disp(2, "Srv:" + serverIp);
   disp(3, "IP: " + WiFi.localIP().toString());
 
   sendHeartbeat();
